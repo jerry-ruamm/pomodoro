@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>番茄钟 Pomodoro Timer</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card: #16213e;
+    --primary: #e94560;
+    --primary-light: #ff6b81;
+    --text: #eee;
+    --text-dim: #a0a0b0;
+    --work-color: #e94560;
+    --break-color: #0f3460;
+    --accent-green: #2ecc71;
+    --ring-bg: #2a2a4a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: var(--bg);
+    user-select: none;
+    -webkit-app-region: drag;
+  }
+
+  .container {
+    text-align: center;
+    padding: 40px;
+  }
+
+  .mode-tabs {
+    display: flex;
+    gap: 6px;
+    background: var(--ring-bg);
+    border-radius: 30px;
+    padding: 4px;
+    margin-bottom: 36px;
+    -webkit-app-region: no-drag;
+  }
+
+  .mode-tab {
+    flex: 1;
+    padding: 10px 24px;
+    border-radius: 26px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+
+  .mode-tab.active {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .timer-ring-wrapper {
+    position: relative;
+    width: 320px;
+    height: 320px;
+    margin: 0 auto 36px;
+  }
+
+  .timer-ring {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .ring-bg {
+    fill: none;
+    stroke: var(--ring-bg);
+    stroke-width: 8;
+  }
+
+  .ring-progress {
+    fill: none;
+    stroke: var(--primary);
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s linear;
+  }
+
+  .ring-progress.break-mode {
+    stroke: var(--accent-green);
+  }
+
+  .timer-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+
+  .time-display {
+    font-size: 72px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 2px;
+  }
+
+  .status-label {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+    -webkit-app-region: no-drag;
+  }
+
+  .btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: transparent;
+    color: var(--text);
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.3);
+  }
+
+  .btn:active {
+    transform: scale(0.95);
+  }
+
+  .btn-primary {
+    width: 64px;
+    height: 64px;
+    background: var(--primary);
+    border: none;
+    font-size: 24px;
+    box-shadow: 0 4px 20px rgba(233, 69, 96, 0.4);
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-light);
+    box-shadow: 0 6px 24px rgba(233, 69, 96, 0.5);
+  }
+
+  .btn-primary.paused {
+    background: var(--accent-green);
+    box-shadow: 0 4px 20px rgba(46, 204, 113, 0.4);
+  }
+
+  .btn-primary.paused:hover {
+    box-shadow: 0 6px 24px rgba(46, 204, 113, 0.5);
+  }
+
+  .session-info {
+    color: var(--text-dim);
+    font-size: 13px;
+    -webkit-app-region: no-drag;
+  }
+
+  .session-info span {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .settings {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 20px;
+    -webkit-app-region: no-drag;
+  }
+
+  .setting-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .setting-item label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .setting-item input {
+    width: 52px;
+    padding: 6px;
+    text-align: center;
+    background: var(--ring-bg);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+  }
+
+  .setting-item input:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+
+  /* Animations */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .urgent {
+    animation: pulse 0.5s ease-in-out infinite;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="work">工作 25:00</button>
+    <button class="mode-tab" data-mode="shortBreak">短休息 5:00</button>
+    <button class="mode-tab" data-mode="longBreak">长休息 15:00</button>
+  </div>
+
+  <div class="timer-ring-wrapper">
+    <svg class="timer-ring" viewBox="0 0 200 200">
+      <circle class="ring-bg" cx="100" cy="100" r="92"/>
+      <circle class="ring-progress" id="ringProgress" cx="100" cy="100" r="92"
+              stroke-dasharray="578.05" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-text">
+      <div class="time-display" id="timeDisplay">25:00</div>
+      <div class="status-label" id="statusLabel">准备开始</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnReset" title="重置">↺</button>
+    <button class="btn btn-primary" id="btnToggle" title="开始">▶</button>
+    <button class="btn" id="btnSkip" title="跳过">⏭</button>
+  </div>
+
+  <div class="session-info">
+    今日已完成 <span id="sessionCount">0</span> 个番茄
+  </div>
+
+  <div class="settings">
+    <div class="setting-item">
+      <label>工作时长 (分)</label>
+      <input type="number" id="workMinutes" value="25" min="1" max="120">
+    </div>
+    <div class="setting-item">
+      <label>短休息 (分)</label>
+      <input type="number" id="shortBreakMinutes" value="5" min="1" max="30">
+    </div>
+    <div class="setting-item">
+      <label>长休息 (分)</label>
+      <input type="number" id="longBreakMinutes" value="15" min="1" max="60">
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── State ──
+  const CIRCUMFERENCE = 2 * Math.PI * 92; // ≈578.05
+
+  let mode = 'work';
+  let timeLeft = 25 * 60; // seconds
+  let totalTime = 25 * 60;
+  let timerId = null;
+  let autoStartId = null;
+  let isRunning = false;
+  let sessionCount = 0;
+  let audioCtx = null;
+
+  // ── DOM refs ──
+  const $timeDisplay = document.getElementById('timeDisplay');
+  const $statusLabel = document.getElementById('statusLabel');
+  const $ringProgress = document.getElementById('ringProgress');
+  const $btnToggle = document.getElementById('btnToggle');
+  const $btnReset = document.getElementById('btnReset');
+  const $btnSkip = document.getElementById('btnSkip');
+  const $sessionCount = document.getElementById('sessionCount');
+  const $modeTabs = document.querySelectorAll('.mode-tab');
+  const $workMinutes = document.getElementById('workMinutes');
+  const $shortBreakMinutes = document.getElementById('shortBreakMinutes');
+  const $longBreakMinutes = document.getElementById('longBreakMinutes');
+
+  // ── Format time ──
+  function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  // ── Update display ──
+  function updateDisplay() {
+    $timeDisplay.textContent = formatTime(timeLeft);
+
+    const elapsed = totalTime - timeLeft;
+    const fraction = totalTime > 0 ? elapsed / totalTime : 0;
+    const offset = CIRCUMFERENCE * (1 - fraction);
+    $ringProgress.setAttribute('stroke-dashoffset', offset);
+
+    // Urgency pulse in last 10 seconds
+    if (timeLeft <= 10 && isRunning) {
+      $timeDisplay.classList.add('urgent');
+    } else {
+      $timeDisplay.classList.remove('urgent');
+    }
+  }
+
+  // ── Set mode ring color ──
+  function updateRingColor() {
+    if (mode === 'work') {
+      $ringProgress.classList.remove('break-mode');
+    } else {
+      $ringProgress.classList.add('break-mode');
+    }
+  }
+
+  // ── Set time from mode ──
+  function getMinutesForMode(m) {
+    if (m === 'work') return parseInt($workMinutes.value) || 25;
+    if (m === 'shortBreak') return parseInt($shortBreakMinutes.value) || 5;
+    if (m === 'longBreak') return parseInt($longBreakMinutes.value) || 15;
+    return 25;
+  }
+
+  function setMode(newMode) {
+    mode = newMode;
+    timeLeft = getMinutesForMode(newMode) * 60;
+    totalTime = timeLeft;
+
+    // Update tabs
+    $modeTabs.forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.mode === newMode);
+    });
+
+    // Update status label
+    const labels = { work: '专注工作中', shortBreak: '休息一下', longBreak: '长休息' };
+    $statusLabel.textContent = labels[newMode] || '';
+
+    updateRingColor();
+    updateDisplay();
+  }
+
+  // ── Timer tick ──
+  function tick() {
+    if (timeLeft <= 0) {
+      finishSession();
+      return;
+    }
+    timeLeft--;
+    updateDisplay();
+  }
+
+  // ── Start/pause ──
+  function toggleTimer() {
+    if (isRunning) {
+      pauseTimer();
+    } else {
+      startTimer();
+    }
+  }
+
+  function startTimer() {
+    isRunning = true;
+    $btnToggle.textContent = '⏸';
+    $btnToggle.classList.add('paused');
+    $statusLabel.textContent = mode === 'work' ? '专注工作中' : '休息中...';
+    timerId = setInterval(tick, 1000);
+  }
+
+  function pauseTimer() {
+    isRunning = false;
+    $btnToggle.textContent = '▶';
+    $btnToggle.classList.remove('paused');
+    $statusLabel.textContent = '已暂停';
+    clearInterval(timerId);
+    timerId = null;
+    clearTimeout(autoStartId);
+    autoStartId = null;
+  }
+
+  function resetTimer() {
+    pauseTimer();
+    timeLeft = getMinutesForMode(mode) * 60;
+    totalTime = timeLeft;
+    $statusLabel.textContent = '准备开始';
+    updateDisplay();
+  }
+
+  function skipSession() {
+    pauseTimer();
+    finishSession();
+  }
+
+  // ── Finish ──
+  function finishSession() {
+    clearInterval(timerId);
+    timerId = null;
+    isRunning = false;
+    $btnToggle.textContent = '▶';
+    $btnToggle.classList.remove('paused');
+    $timeDisplay.classList.remove('urgent');
+
+    const finishedMode = mode;
+
+    if (finishedMode === 'work') {
+      sessionCount++;
+      $sessionCount.textContent = sessionCount;
+
+      if (sessionCount % 4 === 0) {
+        setMode('longBreak');
+      } else {
+        setMode('shortBreak');
+      }
+
+      $statusLabel.textContent = '时间到！休息一下';
+    } else {
+      setMode('work');
+      $statusLabel.textContent = '干活了！';
+    }
+
+    updateRingColor();
+    updateDisplay();
+
+    notify(finishedMode);
+
+    clearTimeout(autoStartId);
+    autoStartId = setTimeout(() => {
+      if (!isRunning) {
+        startTimer();
+      }
+    }, 3000);
+  }
+
+  // ── Notification ──
+  function notify(finishedMode) {
+    const wasWork = finishedMode === 'work';
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const title = wasWork ? '🍅 工作时间到！' : '☕ 休息结束！';
+      const body = wasWork
+        ? '该休息一下了。'
+        : '休息结束，开始新的番茄钟！';
+      new Notification(title, { body, silent: false });
+    }
+
+    let count = 0;
+    const originalTitle = document.title;
+    const flashTitle = wasWork ? '⏰ 时间到！' : '☕ 休息结束！';
+    const flashId = setInterval(() => {
+      document.title = count % 2 === 0 ? flashTitle : originalTitle;
+      count++;
+      if (count >= 6) {
+        clearInterval(flashId);
+        document.title = originalTitle;
+      }
+    }, 600);
+
+    try {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+      }
+      const beep = () => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = 880;
+        osc.type = 'sine';
+        gain.gain.value = 0.3;
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.15);
+      };
+      beep();
+      setTimeout(beep, 200);
+      setTimeout(beep, 400);
+    } catch (e) {
+      // Audio not available
+    }
+  }
+
+  // ── Event bindings ──
+  $btnToggle.addEventListener('click', toggleTimer);
+  $btnReset.addEventListener('click', resetTimer);
+  $btnSkip.addEventListener('click', skipSession);
+
+  $modeTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      pauseTimer();
+      setMode(tab.dataset.mode);
+    });
+  });
+
+  // Settings change update display
+  [$workMinutes, $shortBreakMinutes, $longBreakMinutes].forEach(input => {
+    input.addEventListener('change', () => {
+      if (!isRunning) {
+        const mins = getMinutesForMode(mode) * 60;
+        timeLeft = mins;
+        totalTime = mins;
+        updateDisplay();
+        // Update tab labels
+        updateTabLabels();
+      }
+    });
+  });
+
+  function updateTabLabels() {
+    const wm = parseInt($workMinutes.value) || 25;
+    const sm = parseInt($shortBreakMinutes.value) || 5;
+    const lm = parseInt($longBreakMinutes.value) || 15;
+    $modeTabs[0].textContent = `工作 ${String(wm).padStart(2, '0')}:00`;
+    $modeTabs[1].textContent = `短休息 ${String(sm).padStart(2, '0')}:00`;
+    $modeTabs[2].textContent = `长休息 ${String(lm).padStart(2, '0')}:00`;
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      toggleTimer();
+    } else if (e.code === 'KeyR') {
+      resetTimer();
+    } else if (e.code === 'KeyS') {
+      skipSession();
+    }
+  });
+
+  // Request notification permission on first interaction
+  document.addEventListener('click', () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, { once: true });
+
+  // ── Init ──
+  updateRingColor();
+  updateDisplay();
+  updateTabLabels();
+</script>
+</body>
+</html>
