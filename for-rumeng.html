@@ -319,12 +319,6 @@ html, body {
 <!-- ========== 音乐按钮 ========== -->
 <button id="music-btn" class="music-btn" title="播放背景音乐" aria-label="音乐播放">🎵</button>
 
-<!--
-  音乐文件：将你的 mp3 文件放到同目录下，然后修改下方 src
-  例如 <source src="bg.mp3" type="audio/mpeg">
-  目前没有设置 src，音乐按钮点击不会报错，但也不会播放声音
--->
-<audio id="bg-music" loop preload="auto"></audio>
 
 <script>
 // ============================================================
@@ -334,7 +328,6 @@ const CONFIG = {
   girlName:  '陈茹梦',        // 她的名字
   myName:    '姚汶辰',        // 你的名字
   startDate: '2025-11-24',   // 纪念日（格式 YYYY-MM-DD，当日为第 0 天）
-  musicSrc:  'bg.mp3',             // 音乐文件路径，如 'bg.mp3'
 };
 // ============================================================
 
@@ -343,12 +336,8 @@ const loadingScreen = document.getElementById('loading-screen');
 const mainContent   = document.getElementById('main-content');
 const daysCountEl   = document.getElementById('days-count');
 const musicBtn      = document.getElementById('music-btn');
-const bgMusic       = document.getElementById('bg-music');
 const canvas        = document.getElementById('bg-canvas');
 const ctx           = canvas.getContext('2d');
-
-// 设置音乐源
-if (CONFIG.musicSrc) bgMusic.src = CONFIG.musicSrc;
 
 // ---------- 日期间的天数（考虑闰年，JS Date 原生处理） ----------
 function calcDays(startDateStr) {
@@ -509,23 +498,110 @@ document.addEventListener('click', function (e) {
   span.addEventListener('animationend', function () { span.remove(); });
 });
 
+// ---------- Web Audio 音乐引擎 ----------
+let audioCtx = null;
+let musicPlaying = false;
+let mainGain = null;
+let harmonyOscs = [];
+let scheduleTimer = null;
+
+const BPM = 72;
+const BEAT = 60 / BPM;
+
+// 主旋律 [频率Hz, 节拍数]，C大调五声音阶，音乐盒风格
+const melodyNotes = [
+  [329.63, 1.5], [392.00, 0.5], [523.25, 2],
+  [392.00, 1], [329.63, 1.5], [293.66, 0.5], [261.63, 2],
+  [329.63, 1.5], [392.00, 0.5], [440.00, 2],
+  [392.00, 1.5], [329.63, 0.5], [293.66, 1], [261.63, 1],
+  [293.66, 1], [329.63, 1], [392.00, 2],
+  [329.63, 1.5], [261.63, 0.5], [293.66, 1], [329.63, 1],
+  [392.00, 1], [440.00, 1], [523.25, 2],
+  [587.33, 1], [523.25, 1], [440.00, 1], [392.00, 1],
+];
+
+const sparkleFreqs = [1046.50, 1318.51, 1567.98];
+
+function playNote(ctx, freq, startTime, dur, vol) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(vol, startTime + 0.06);
+  gain.gain.linearRampToValueAtTime(vol * 0.55, startTime + 0.18);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
+
+  osc.connect(gain);
+  gain.connect(mainGain);
+  osc.start(startTime);
+  osc.stop(startTime + dur + 0.05);
+}
+
+function startMusic() {
+  if (audioCtx) audioCtx.close();
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  mainGain = audioCtx.createGain();
+  mainGain.gain.value = 0.22;
+  mainGain.connect(audioCtx.destination);
+
+  musicPlaying = true;
+
+  [130.81, 196.00].forEach(freq => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.value = 0.035;
+    osc.connect(gain);
+    gain.connect(mainGain);
+    osc.start();
+    harmonyOscs.push({ osc, gain });
+  });
+
+  scheduleLoop();
+}
+
+function scheduleLoop() {
+  if (!musicPlaying || !audioCtx) return;
+
+  const now = audioCtx.currentTime;
+  let time = now + 0.1;
+
+  for (const [freq, beats] of melodyNotes) {
+    const dur = beats * BEAT * 0.82;
+    playNote(audioCtx, freq, time, dur, 0.32);
+    time += beats * BEAT;
+  }
+
+  if (Math.random() < 0.55) {
+    const sf = sparkleFreqs[Math.floor(Math.random() * sparkleFreqs.length)];
+    playNote(audioCtx, sf, now + Math.random() * (time - now), 0.12, 0.025);
+  }
+
+  const loopMs = melodyNotes.reduce((sum, [, b]) => sum + b, 0) * BEAT * 1000;
+  scheduleTimer = setTimeout(scheduleLoop, loopMs - 250);
+}
+
+function stopMusic() {
+  musicPlaying = false;
+  clearTimeout(scheduleTimer);
+  harmonyOscs.forEach(h => { try { h.osc.stop(); } catch(e) {} });
+  harmonyOscs = [];
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+}
+
 // ---------- 音乐按钮 ----------
 musicBtn.addEventListener('click', function () {
-  if (!CONFIG.musicSrc) {
-    // 无音乐文件时的友好提示（闪烁一下）
-    musicBtn.style.opacity = '0.4';
-    setTimeout(() => { musicBtn.style.opacity = '1'; }, 200);
-    return;
-  }
-  if (bgMusic.paused) {
-    bgMusic.play().then(() => {
-      musicBtn.classList.add('playing');
-      musicBtn.textContent = '🎶';
-    }).catch(() => {}); // 自动播放被拦截时静默处理
-  } else {
-    bgMusic.pause();
+  if (musicPlaying) {
+    stopMusic();
     musicBtn.classList.remove('playing');
     musicBtn.textContent = '🎵';
+  } else {
+    startMusic();
+    musicBtn.classList.add('playing');
+    musicBtn.textContent = '🎶';
   }
 });
 
