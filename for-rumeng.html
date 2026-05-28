@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>To 陈茹梦 ❤️</title>
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=ZCOOL+XiaoWei&display=swap" rel="stylesheet">
+<style>
+/* ========== 基础重置 ========== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  overflow-x: hidden;
+  font-family: 'ZCOOL XiaoWei', 'STKaiti', 'KaiTi', '楷体', 'PingFang SC', 'Microsoft YaHei', serif;
+  color: #fff;
+  background: #06060f;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ========== Canvas 背景层 ========== */
+#bg-canvas {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ========== 加载画面 ========== */
+#loading-screen {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #06060f;
+  transition: opacity 0.8s ease;
+}
+#loading-screen.fade-out { opacity: 0; pointer-events: none; }
+.loading-text {
+  font-size: clamp(1.2rem, 4vw, 1.6rem);
+  color: #ffb3c6;
+  letter-spacing: 0.15em;
+  animation: loadingPulse 1.5s ease-in-out infinite;
+}
+.loading-dots { display: flex; gap: 8px; margin-top: 20px; }
+.loading-dots span {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #ff6b9d;
+  animation: dotBounce 1.4s ease-in-out infinite;
+}
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes loadingPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-12px); opacity: 1; }
+}
+
+/* ========== 主内容区 ========== */
+#main-content {
+  position: relative; z-index: 1;
+  max-width: 520px; margin: 0 auto;
+  padding: 40px 24px 60px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 28px;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+#main-content.visible { opacity: 1; }
+#main-content.visible > * {
+  animation: fadeInUp 0.8s ease-out forwards;
+  opacity: 0;
+}
+#main-content.visible > *:nth-child(1) { animation-delay: 0.1s; }
+#main-content.visible > *:nth-child(2) { animation-delay: 0.3s; }
+#main-content.visible > *:nth-child(3) { animation-delay: 0.5s; }
+#main-content.visible > *:nth-child(4) { animation-delay: 0.7s; }
+#main-content.visible > *:nth-child(5) { animation-delay: 0.9s; }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ========== 标题 ========== */
+.title-section { text-align: center; }
+.title-to {
+  font-family: 'Dancing Script', cursive;
+  font-size: clamp(1.4rem, 5vw, 2rem);
+  color: #ffb3c6;
+  display: block;
+  margin-bottom: 4px;
+}
+.title-name {
+  font-size: clamp(2.4rem, 8vw, 3.8rem);
+  font-weight: bold;
+  background: linear-gradient(135deg, #ffb3c6 0%, #ff6b9d 30%, #ff4081 60%, #fff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 18px rgba(255, 107, 157, 0.5));
+  letter-spacing: 0.12em;
+}
+
+/* ========== 跳动的心 ========== */
+.heart-container {
+  display: flex; align-items: center; justify-content: center;
+}
+.heart {
+  width: 64px; height: 58px;
+  position: relative;
+  animation: heartbeat 1.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 20px rgba(255, 64, 129, 0.6));
+}
+.heart::before, .heart::after {
+  content: '';
+  position: absolute; top: 0;
+  width: 32px; height: 52px;
+  background: linear-gradient(180deg, #ff4081 0%, #e91e63 100%);
+  border-radius: 32px 32px 0 0;
+}
+.heart::before {
+  left: 32px;
+  transform: rotate(-45deg);
+  transform-origin: 0 100%;
+}
+.heart::after {
+  left: 0;
+  transform: rotate(45deg);
+  transform-origin: 100% 100%;
+}
+
+@keyframes heartbeat {
+  0%   { transform: scale(1); }
+  14%  { transform: scale(1.25); }
+  28%  { transform: scale(1); }
+  42%  { transform: scale(1.25); }
+  56%  { transform: scale(1); }
+  70%  { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* ========== 天数计数器 ========== */
+.days-section {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 24px 36px;
+}
+.days-label {
+  font-size: clamp(0.95rem, 3vw, 1.15rem);
+  color: #ffb3c6;
+  letter-spacing: 0.1em;
+}
+.days-number {
+  font-family: 'Dancing Script', 'Georgia', cursive;
+  font-size: clamp(3rem, 10vw, 5rem);
+  font-weight: bold;
+  background: linear-gradient(180deg, #ffb3c6 0%, #ff6b9d 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.2;
+  margin: 4px 0;
+}
+.days-unit {
+  font-size: clamp(0.9rem, 2.5vw, 1.05rem);
+  color: #ffb3c6;
+  letter-spacing: 0.08em;
+}
+
+/* ========== 告白文字 ========== */
+.confession-section {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 28px 24px;
+}
+.confession-text {
+  font-size: clamp(0.95rem, 2.8vw, 1.08rem);
+  line-height: 2.1;
+  color: #f0d5e0;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 12px rgba(255, 179, 198, 0.15);
+}
+
+/* ========== 签名 ========== */
+.signature {
+  font-family: 'Dancing Script', 'Georgia', cursive;
+  font-size: clamp(1.2rem, 4vw, 1.6rem);
+  color: #ffb3c6;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 16px rgba(255, 107, 157, 0.4);
+}
+
+/* ========== 飘浮文字 ========== */
+.floating-text {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  font-size: clamp(1rem, 3.5vw, 1.3rem);
+  font-weight: bold;
+  color: #ffb3c6;
+  text-shadow: 0 0 14px rgba(255, 107, 157, 0.8), 0 0 30px rgba(255, 107, 157, 0.4);
+  white-space: nowrap;
+  animation: floatAway 1s ease-out forwards;
+}
+
+@keyframes floatAway {
+  0%   { opacity: 1; transform: translate(-50%, -50%) scale(0.8); }
+  30%  { opacity: 1; transform: translate(-50%, calc(-50% - 20px)) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 80px)) scale(1); }
+}
+
+/* ========== 音乐按钮 ========== */
+.music-btn {
+  position: fixed;
+  bottom: 28px; right: 24px;
+  z-index: 50;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.3s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.music-btn:active { transform: scale(0.92); }
+.music-btn.playing {
+  border-color: rgba(255, 107, 157, 0.6);
+  box-shadow: 0 0 20px rgba(255, 107, 157, 0.5);
+  animation: musicGlow 1.8s ease-in-out infinite;
+}
+
+@keyframes musicGlow {
+  0%, 100% { box-shadow: 0 0 12px rgba(255, 107, 157, 0.3); }
+  50%      { box-shadow: 0 0 28px rgba(255, 107, 157, 0.7); }
+}
+
+/* ========== 响应式微调 ========== */
+@media (max-width: 380px) {
+  #main-content { padding: 30px 16px 50px; gap: 22px; }
+  .days-section { padding: 18px 24px; }
+  .confession-section { padding: 20px 16px; }
+  .music-btn { width: 46px; height: 46px; bottom: 20px; right: 16px; font-size: 1.2rem; }
+}
+@media (min-width: 768px) {
+  #main-content { padding: 60px 32px 80px; gap: 36px; }
+  .heart { width: 80px; height: 72px; }
+  .heart::before, .heart::after { width: 40px; height: 64px; border-radius: 40px 40px 0 0; }
+  .heart::before { left: 40px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ========== 加载画面 ========== -->
+<div id="loading-screen">
+  <p class="loading-text">✨ 星星正在为你点亮...</p>
+  <div class="loading-dots">
+    <span></span><span></span><span></span>
+  </div>
+</div>
+
+<!-- ========== 主内容 ========== -->
+<div id="main-content">
+  <!-- 标题 -->
+  <div class="title-section">
+    <span class="title-to">To</span>
+    <h1 class="title-name">陈茹梦</h1>
+  </div>
+
+  <!-- 跳动的心 -->
+  <div class="heart-container">
+    <div class="heart"></div>
+  </div>
+
+  <!-- 相爱天数 -->
+  <div class="days-section">
+    <p class="days-label">我们已经相爱</p>
+    <p class="days-number" id="days-count">0</p>
+    <p class="days-unit">天</p>
+  </div>
+
+  <!-- 告白文字 -->
+  <div class="confession-section">
+    <p class="confession-text">
+      亲爱的茹梦，从遇见你的那天起，我的世界便有了光。你的名字如诗——茹梦，像梦境般温柔而美好，而遇见你，就是我生命中最美的梦。每一天醒来，想到有你在身边，平凡的日子都变得闪闪发光。你的笑容是我前行的动力，你的温柔是我最暖的港湾。未来的路还很长，但只要有你在，我就无所畏惧。茹梦，谢谢你出现在我的生命里，让我成为这世上最幸福的人。我爱你，胜过世间万物。
+    </p>
+  </div>
+
+  <!-- 签名 -->
+  <p class="signature">永远爱你的&nbsp;姚汶辰</p>
+</div>
+
+<!-- ========== Canvas 背景（星星 + 飘落爱心） ========== -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- ========== 音乐按钮 ========== -->
+<button id="music-btn" class="music-btn" title="播放背景音乐" aria-label="音乐播放">🎵</button>
+
+<!--
+  音乐文件：将你的 mp3 文件放到同目录下，然后修改下方 src
+  例如 <source src="bg.mp3" type="audio/mpeg">
+  目前没有设置 src，音乐按钮点击不会报错，但也不会播放声音
+-->
+<audio id="bg-music" loop preload="auto"></audio>
+
+<script>
+// ============================================================
+//  ★ 可修改配置区 ★
+// ============================================================
+const CONFIG = {
+  girlName:  '陈茹梦',        // 她的名字
+  myName:    '姚汶辰',        // 你的名字
+  startDate: '2025-11-24',   // 纪念日（格式 YYYY-MM-DD，当日为第 0 天）
+  musicSrc:  '',             // 音乐文件路径，如 'bg.mp3'
+};
+// ============================================================
+
+// ---------- DOM 引用 ----------
+const loadingScreen = document.getElementById('loading-screen');
+const mainContent   = document.getElementById('main-content');
+const daysCountEl   = document.getElementById('days-count');
+const musicBtn      = document.getElementById('music-btn');
+const bgMusic       = document.getElementById('bg-music');
+const canvas        = document.getElementById('bg-canvas');
+const ctx           = canvas.getContext('2d');
+
+// 设置音乐源
+if (CONFIG.musicSrc) bgMusic.src = CONFIG.musicSrc;
+
+// ---------- 日期间的天数（考虑闰年，JS Date 原生处理） ----------
+function calcDays(startDateStr) {
+  const start = new Date(startDateStr + 'T00:00:00');
+  const now   = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor((today - start) / 86400000);
+}
+
+function updateDays() {
+  daysCountEl.textContent = calcDays(CONFIG.startDate);
+}
+updateDays();
+// 每天午夜自动刷新
+const msToMidnight =
+  new Date().setHours(24, 0, 0, 0) - Date.now();
+setTimeout(() => {
+  updateDays();
+  setInterval(updateDays, 86400000);
+}, msToMidnight + 1000);
+
+// ---------- Canvas 设置 ----------
+let W, H;
+
+function resizeCanvas() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  generateStars();
+}
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
+
+// ---------- 星星（静态 + 闪烁） ----------
+const stars = [];
+const STAR_COUNT = 160;
+
+function generateStars() {
+  stars.length = 0;
+  for (let i = 0; i < STAR_COUNT; i++) {
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 1.8 + 0.6,
+      baseAlpha: Math.random() * 0.6 + 0.4,
+      twinklePhase: Math.random() * Math.PI * 2,
+      twinkleSpeed: Math.random() * 0.02 + 0.008,
+      isBright: Math.random() < 0.12,   // 12% 概率是大亮星
+    });
+  }
+}
+
+// ---------- 爱心绘制（参数方程） ----------
+function drawHeartPath(cx, cy, size) {
+  ctx.beginPath();
+  const steps = 60;
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2;
+    const x = 16 * Math.pow(Math.sin(t), 3);
+    const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+    const px = cx + x * size;
+    const py = cy + y * size;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+// ---------- 飘落爱心 ----------
+const hearts = [];
+const HEART_COLORS = [
+  '#ff6b9d', '#ff8fab', '#ff4081', '#ffb3c6',
+  '#e91e63', '#f06292', '#ec407a', '#ff80ab',
+  '#f48fb1', '#ff99bb', '#ff5c8a', '#ffd1e0',
+];
+const MAX_HEARTS = 45;
+let frameCount = 0;
+
+function spawnHeart() {
+  if (hearts.length >= MAX_HEARTS) return;
+  hearts.push({
+    x: Math.random() * W,
+    y: -30 - Math.random() * 80,
+    size: Math.random() * 14 + 8,
+    speed: Math.random() * 1.2 + 0.5,
+    opacity: Math.random() * 0.5 + 0.35,
+    color: HEART_COLORS[Math.floor(Math.random() * HEART_COLORS.length)],
+    wobbleAmp: Math.random() * 0.6 + 0.2,
+    wobbleSpeed: Math.random() * 0.025 + 0.012,
+    wobblePhase: Math.random() * Math.PI * 2,
+    rotation: Math.random() * 0.5 - 0.25,
+    rotateSpeed: (Math.random() - 0.5) * 0.02,
+  });
+}
+
+function updateAndDrawHearts() {
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    const h = hearts[i];
+    h.y += h.speed;
+    h.wobblePhase += h.wobbleSpeed;
+    h.x += Math.sin(h.wobblePhase) * h.wobbleAmp;
+    h.rotation += h.rotateSpeed;
+
+    if (h.y > H + 60) { hearts.splice(i, 1); continue; }
+
+    ctx.save();
+    ctx.globalAlpha = h.opacity;
+    ctx.translate(h.x, h.y);
+    ctx.rotate(h.rotation);
+    ctx.fillStyle = h.color;
+    drawHeartPath(0, 0, h.size);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ---------- 动画主循环 ----------
+function animate(timestamp) {
+  ctx.clearRect(0, 0, W, H);
+
+  // 绘制星星（部分闪烁）
+  for (const s of stars) {
+    let alpha = s.baseAlpha;
+    if (s.isBright) {
+      alpha = s.baseAlpha + Math.sin(timestamp * s.twinkleSpeed + s.twinklePhase) * 0.3;
+      alpha = Math.max(0.2, Math.min(1, alpha));
+    }
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 大亮星加辉光
+    if (s.isBright && alpha > s.baseAlpha + 0.1) {
+      const glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4);
+      glow.addColorStop(0, `rgba(255,220,240,${alpha * 0.4})`);
+      glow.addColorStop(1, 'rgba(255,220,240,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(s.x - s.r * 4, s.y - s.r * 4, s.r * 8, s.r * 8);
+    }
+  }
+
+  // 生成 & 绘制飘落爱心
+  if (frameCount % 8 === 0) spawnHeart();
+  updateAndDrawHearts();
+
+  frameCount++;
+  requestAnimationFrame(animate);
+}
+
+// ---------- 点击飘浮文字 ----------
+document.addEventListener('click', function (e) {
+  const span = document.createElement('span');
+  span.className = 'floating-text';
+  span.textContent = '✨ 茹梦，爱你 ✨';
+  span.style.left = e.clientX + 'px';
+  span.style.top  = e.clientY + 'px';
+  document.body.appendChild(span);
+  span.addEventListener('animationend', function () { span.remove(); });
+});
+
+// ---------- 音乐按钮 ----------
+musicBtn.addEventListener('click', function () {
+  if (!CONFIG.musicSrc) {
+    // 无音乐文件时的友好提示（闪烁一下）
+    musicBtn.style.opacity = '0.4';
+    setTimeout(() => { musicBtn.style.opacity = '1'; }, 200);
+    return;
+  }
+  if (bgMusic.paused) {
+    bgMusic.play().then(() => {
+      musicBtn.classList.add('playing');
+      musicBtn.textContent = '🎶';
+    }).catch(() => {}); // 自动播放被拦截时静默处理
+  } else {
+    bgMusic.pause();
+    musicBtn.classList.remove('playing');
+    musicBtn.textContent = '🎵';
+  }
+});
+
+// ---------- 加载流程 ----------
+function init() {
+  resizeCanvas();
+  requestAnimationFrame(animate);
+
+  // 2.8 秒后淡出加载画面
+  setTimeout(() => {
+    loadingScreen.classList.add('fade-out');
+    // 0.8 秒（过渡结束）后显示主内容
+    setTimeout(() => {
+      loadingScreen.style.display = 'none';
+      mainContent.classList.add('visible');
+    }, 800);
+  }, 2800);
+}
+
+init();
+</script>
+</body>
+</html>
