@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D 球体抽奖系统</title>
+<style>
+  /* ===== 全局重置与基础 ===== */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+    background: radial-gradient(ellipse at 50% 40%, #0d0d2b 0%, #050510 70%);
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    color: #e0e0e0;
+  }
+
+  /* 背景动态光晕 */
+  .bg-orb {
+    position: fixed; border-radius: 50%;
+    filter: blur(120px); pointer-events: none; z-index: 0;
+  }
+  .bg-orb-1 {
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(0,180,216,0.25) 0%, transparent 70%);
+    top: -200px; left: -100px;
+    animation: orbFloat1 18s ease-in-out infinite;
+  }
+  .bg-orb-2 {
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(123,47,255,0.2) 0%, transparent 70%);
+    bottom: -150px; right: -100px;
+    animation: orbFloat2 22s ease-in-out infinite;
+  }
+  .bg-orb-3 {
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(0,180,216,0.15) 0%, transparent 70%);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    animation: orbFloat3 20s ease-in-out infinite;
+  }
+
+  @keyframes orbFloat1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(80px, 60px) scale(1.15); }
+    66% { transform: translate(-40px, -30px) scale(0.9); }
+  }
+  @keyframes orbFloat2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(-70px, -40px) scale(1.1); }
+    66% { transform: translate(50px, 30px) scale(0.85); }
+  }
+  @keyframes orbFloat3 {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.3); }
+  }
+
+  /* ===== 画布容器 ===== */
+  #canvas-container {
+    position: fixed; inset: 0; z-index: 1;
+  }
+  #canvas-container canvas { display: block; }
+
+  /* ===== UI 覆盖层 ===== */
+  #ui-layer {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: space-between;
+    pointer-events: none;
+    padding: 32px 24px;
+  }
+  #ui-layer > * { pointer-events: auto; }
+
+  /* ===== 标题 ===== */
+  .title {
+    font-size: clamp(24px, 3.5vw, 42px);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    background: linear-gradient(135deg, #00d4ff 0%, #a78bfa 50%, #00d4ff 100%);
+    background-size: 200% 200%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: titleShimmer 4s ease-in-out infinite;
+    text-align: center;
+  }
+  @keyframes titleShimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  /* ===== 中奖展示 ===== */
+  #winner-display {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    z-index: 20; pointer-events: none;
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  #winner-display.show {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .winner-card {
+    background: rgba(10, 10, 30, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 215, 0, 0.4);
+    border-radius: 24px;
+    padding: 48px 64px;
+    text-align: center;
+    box-shadow:
+      0 0 80px rgba(255, 215, 0, 0.25),
+      0 0 160px rgba(255, 180, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    animation: winnerGlow 2s ease-in-out infinite;
+  }
+  @keyframes winnerGlow {
+    0%, 100% { box-shadow: 0 0 80px rgba(255,215,0,0.25), 0 0 160px rgba(255,180,0,0.12); }
+    50% { box-shadow: 0 0 120px rgba(255,215,0,0.4), 0 0 200px rgba(255,180,0,0.2); }
+  }
+  .winner-label {
+    font-size: 16px; color: rgba(255,255,255,0.5);
+    letter-spacing: 0.15em; margin-bottom: 12px;
+  }
+  .winner-name {
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 900;
+    background: linear-gradient(180deg, #ffd700 0%, #ff8c00 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 24px rgba(255, 215, 0, 0.6));
+  }
+
+  /* ===== 控制区 ===== */
+  #controls {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    justify-content: center; align-items: center;
+    margin-bottom: 8px;
+  }
+  .btn {
+    padding: 14px 36px;
+    border: none; border-radius: 50px;
+    font-size: 16px; font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative; overflow: hidden;
+    font-family: inherit;
+  }
+  .btn:active { transform: scale(0.95); }
+  .btn:disabled {
+    opacity: 0.35; cursor: not-allowed; pointer-events: none;
+  }
+
+  .btn-start {
+    background: linear-gradient(135deg, #00b4d8, #0077b6);
+    color: #fff;
+    box-shadow: 0 4px 24px rgba(0, 180, 216, 0.35);
+  }
+  .btn-start:hover:not(:disabled) {
+    box-shadow: 0 6px 32px rgba(0, 180, 216, 0.5);
+    transform: translateY(-2px);
+  }
+
+  .btn-stop {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: #fff;
+    box-shadow: 0 4px 24px rgba(255, 107, 107, 0.35);
+  }
+  .btn-stop:hover:not(:disabled) {
+    box-shadow: 0 6px 32px rgba(255, 107, 107, 0.5);
+    transform: translateY(-2px);
+  }
+
+  .btn-reset {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ccc;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+  }
+  .btn-reset:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+  }
+
+  /* ===== 名单面板 ===== */
+  #name-panel {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 20px 24px;
+    width: min(520px, 90vw);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  #name-panel label {
+    font-size: 13px; color: rgba(255,255,255,0.45);
+    letter-spacing: 0.05em;
+  }
+  #name-input {
+    width: 100%; min-height: 72px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: #ddd; font-size: 14px; line-height: 1.8;
+    padding: 12px 16px; resize: vertical;
+    font-family: inherit;
+    transition: border-color 0.3s;
+  }
+  #name-input:focus {
+    outline: none;
+    border-color: rgba(0, 180, 216, 0.5);
+  }
+  #name-input:disabled {
+    opacity: 0.4;
+  }
+  .panel-row {
+    display: flex; gap: 12px; align-items: center;
+  }
+  .btn-apply {
+    padding: 10px 24px;
+    border-radius: 50px;
+    border: 1px solid rgba(0, 180, 216, 0.4);
+    background: rgba(0, 180, 216, 0.1);
+    color: #00d4ff;
+    font-size: 14px; font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .btn-apply:hover:not(:disabled) {
+    background: rgba(0, 180, 216, 0.2);
+    border-color: rgba(0, 180, 216, 0.7);
+  }
+  .btn-apply:disabled { opacity: 0.35; cursor: not-allowed; }
+  .name-count {
+    font-size: 12px; color: rgba(255,255,255,0.4);
+    white-space: nowrap;
+  }
+
+  /* 键盘提示 */
+  .hint {
+    font-size: 11px; color: rgba(255,255,255,0.25);
+    letter-spacing: 0.04em;
+    text-align: center; margin-top: 4px;
+  }
+
+  /* 响应式微调 */
+  @media (max-width: 640px) {
+    #ui-layer { padding: 20px 12px; }
+    .btn { padding: 12px 24px; font-size: 14px; }
+    .winner-card { padding: 32px 36px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 背景光晕 -->
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div class="bg-orb bg-orb-3"></div>
+
+<!-- Three.js 画布 -->
+<div id="canvas-container"></div>
+
+<!-- UI 层 -->
+<div id="ui-layer">
+  <h1 class="title">3D 球体抽奖系统</h1>
+
+  <div></div> <!-- 占位 -->
+
+  <div>
+    <!-- 控制按钮 -->
+    <div id="controls">
+      <button class="btn btn-start" id="btn-start">开始抽奖</button>
+      <button class="btn btn-stop" id="btn-stop" disabled>停止</button>
+      <button class="btn btn-reset" id="btn-reset">重置</button>
+    </div>
+    <p class="hint">Space 开始/停止 &nbsp; R 重置 &nbsp; 鼠标拖拽旋转视角</p>
+
+    <!-- 名单输入 -->
+    <div id="name-panel">
+      <label for="name-input">抽奖名单（逗号分隔）</label>
+      <textarea id="name-input" placeholder="输入名字，用逗号分隔…">刘人瑞,罗宇,龙金林,余秋墨,岳帅,张采云,程于颜,蔡丫丫,成晓源,何昊东,郎梓希,张子萱,廖梅,王家扬,田琴婵,吴嘉豪,付冰冰,王燕,曹素,韦薇,李旭,王玲,朱沈珊,曹浩楠,罗君晨,吴进煜,杨林标</textarea>
+      <div class="panel-row">
+        <button class="btn-apply" id="btn-apply">应用名单</button>
+        <span class="name-count" id="name-count">共 27 人</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 中奖弹窗 -->
+<div id="winner-display">
+  <div class="winner-card">
+    <div class="winner-label">🎉 恭喜中奖</div>
+    <div class="winner-name" id="winner-name-text"></div>
+  </div>
+</div>
+
+<!-- Three.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+
+<script>
+// ============================================================
+// 3D 球体抽奖系统 — Three.js 实现
+// ============================================================
+
+// ----- 配置 -----
+const CONFIG = {
+  sphereRadius: 5,
+  particleCount: 1800,        // 球面粒子数
+  ambientParticleCount: 200,  // 环境漂浮粒子
+  maxSpeed: 0.12,             // 抽奖最大旋转速度 (弧度/帧)
+  idleSpeed: 0.004,           // 待机慢转速度
+  decelFriction: 0.985,       // 减速摩擦系数
+  stopThreshold: 0.0005,      // 判定停止的阈值
+  spriteScale: 1.3,           // 名字精灵缩放
+  cameraDistance: 16
+};
+
+// ----- DOM 引用 -----
+const container = document.getElementById('canvas-container');
+const btnStart = document.getElementById('btn-start');
+const btnStop = document.getElementById('btn-stop');
+const btnReset = document.getElementById('btn-reset');
+const btnApply = document.getElementById('btn-apply');
+const nameInput = document.getElementById('name-input');
+const nameCount = document.getElementById('name-count');
+const winnerDisplay = document.getElementById('winner-display');
+const winnerNameText = document.getElementById('winner-name-text');
+
+// ----- 状态 -----
+let names = [];
+let state = 'idle';           // idle | spinning | decelerating | result
+let currentSpeed = 0;
+let targetSpeed = CONFIG.idleSpeed;
+let winnerName = null;
+let winnerSprite = null;      // 当前高亮的中奖精灵引用
+let nameSprites = [];         // { sprite, name, basePosition }
+let celebration = null;       // 庆祝粒子数据
+
+// ----- Three.js 初始化 -----
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+  50, container.clientWidth / container.clientHeight, 0.5, 100
+);
+camera.position.set(0, 1.5, CONFIG.cameraDistance);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+container.appendChild(renderer.domElement);
+
+// ----- 灯光 -----
+scene.add(new THREE.AmbientLight(0x334466, 2.5));
+const pointLight1 = new THREE.PointLight(0x00b4d8, 40, 30);
+pointLight1.position.set(10, 8, 10);
+scene.add(pointLight1);
+const pointLight2 = new THREE.PointLight(0x7b2fff, 25, 25);
+pointLight2.position.set(-8, -3, -6);
+scene.add(pointLight2);
+
+// ----- 辅助函数：Fibonacci 球面分布 -----
+function fibonacciSphere(n, radius) {
+  const pts = [];
+  const phi = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < n; i++) {
+    const y = 1 - (i / (n - 1)) * 2;
+    const rAtY = Math.sqrt(1 - y * y);
+    const theta = phi * i;
+    pts.push({
+      x: Math.cos(theta) * rAtY * radius,
+      y: y * radius,
+      z: Math.sin(theta) * rAtY * radius
+    });
+  }
+  return pts;
+}
+
+// ----- 辅助函数：Canvas 纹理生成 -----
+function createGlowTexture(innerColor, outerColor, size) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const half = size / 2;
+  const grad = ctx.createRadialGradient(half, half, 0, half, half, half);
+  grad.addColorStop(0, innerColor);
+  grad.addColorStop(0.15, innerColor);
+  grad.addColorStop(1, outerColor);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createNameTexture(name) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  // 文字阴影（发光效果）
+  ctx.shadowColor = 'rgba(0, 180, 216, 0.7)';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 32px "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(name, 128, 64);
+  // 再画一层增强亮度
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.fillText(name, 128, 64);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createGoldenNameTexture(name) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.shadowColor = 'rgba(255, 200, 0, 1)';
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 36px "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(name, 128, 64);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff8dc';
+  ctx.fillText(name, 128, 64);
+  return new THREE.CanvasTexture(canvas);
+}
+
+// ----- 场景构建 -----
+const sphereGroup = new THREE.Group();
+scene.add(sphereGroup);
+
+// 球面粒子（顶点着色混合青/紫色）
+function createParticleSphere() {
+  const count = CONFIG.particleCount;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const cyan = new THREE.Color('#00b4d8');
+  const purple = new THREE.Color('#7b2fff');
+
+  const pts = fibonacciSphere(count, CONFIG.sphereRadius);
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = pts[i].x;
+    positions[i * 3 + 1] = pts[i].y;
+    positions[i * 3 + 2] = pts[i].z;
+    const mix = Math.random();
+    const c = cyan.clone().lerp(purple, mix);
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const dotTex = createGlowTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)', 64);
+  const mat = new THREE.PointsMaterial({
+    size: 0.09,
+    map: dotTex,
+    vertexColors: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.85
+  });
+
+  const points = new THREE.Points(geo, mat);
+  sphereGroup.add(points);
+  return points;
+}
+
+// 线框球体
+function createWireframe() {
+  const geo = new THREE.SphereGeometry(CONFIG.sphereRadius, 48, 24);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0x335577,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.12,
+    depthWrite: true
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  sphereGroup.add(mesh);
+  return mesh;
+}
+
+// 装饰环
+function createRings() {
+  const rings = [];
+  const ringDefs = [
+    { r: CONFIG.sphereRadius + 0.25, color: 0x4488cc, opacity: 0.25, rx: Math.PI / 2, rz: 0 },
+    { r: CONFIG.sphereRadius + 0.45, color: 0x6644cc, opacity: 0.2, rx: Math.PI / 3, rz: Math.PI / 5 },
+    { r: CONFIG.sphereRadius + 0.65, color: 0x3388bb, opacity: 0.15, rx: Math.PI / 4, rz: Math.PI / 3 }
+  ];
+  ringDefs.forEach(def => {
+    const geo = new THREE.TorusGeometry(def.r, 0.012, 16, 160);
+    const mat = new THREE.MeshBasicMaterial({
+      color: def.color,
+      transparent: true,
+      opacity: def.opacity,
+      depthWrite: false
+    });
+    const ring = new THREE.Mesh(geo, mat);
+    ring.rotation.x = def.rx;
+    ring.rotation.z = def.rz;
+    sphereGroup.add(ring);
+    rings.push(ring);
+  });
+  return rings;
+}
+
+// 环境漂浮粒子
+function createAmbientParticles() {
+  const count = CONFIG.ambientParticleCount;
+  const positions = new Float32Array(count * 3);
+  const spread = CONFIG.sphereRadius * 2.8;
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * spread;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * spread;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * spread;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 0.025,
+    color: 0x6688bb,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.45
+  });
+  const pts = new THREE.Points(geo, mat);
+  // 为每个粒子存储漂移速度
+  pts.userData.velocities = [];
+  for (let i = 0; i < count; i++) {
+    pts.userData.velocities.push({
+      x: (Math.random() - 0.5) * 0.003,
+      y: (Math.random() - 0.5) * 0.003,
+      z: (Math.random() - 0.5) * 0.003
+    });
+  }
+  scene.add(pts);
+  return pts;
+}
+
+// 名字精灵组
+function createNameSprites() {
+  clearNameSprites();
+
+  if (names.length === 0) return;
+
+  const pts = fibonacciSphere(names.length, CONFIG.sphereRadius + 0.5);
+  const sharedMat = new THREE.SpriteMaterial({
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    opacity: 1
+  });
+
+  names.forEach((name, i) => {
+    const tex = createNameTexture(name);
+    const mat = sharedMat.clone();
+    mat.map = tex;
+
+    const sprite = new THREE.Sprite(mat);
+    sprite.position.set(pts[i].x, pts[i].y, pts[i].z);
+    sprite.scale.set(CONFIG.spriteScale * 2, CONFIG.spriteScale, 1);
+
+    // 保存精灵原始基准位置（用于 winner 定位）
+    sprite.userData.basePosition = sprite.position.clone();
+    sprite.userData.name = name;
+
+    sphereGroup.add(sprite);
+    nameSprites.push({ sprite, name });
+  });
+}
+
+function clearNameSprites() {
+  nameSprites.forEach(item => sphereGroup.remove(item.sprite));
+  nameSprites = [];
+  winnerSprite = null;
+  winnerName = null;
+}
+
+// 构建场景
+const particleSphere = createParticleSphere();
+const wireframe = createWireframe();
+const rings = createRings();
+const ambientParticles = createAmbientParticles();
+
+// ----- 中奖庆祝粒子 -----
+function spawnCelebration(worldPos) {
+  const count = 180;
+  const positions = new Float32Array(count * 3);
+  const colorsArr = new Float32Array(count * 3);
+  const velocities = [];
+
+  const colorPalette = [
+    new THREE.Color('#ffd700'),
+    new THREE.Color('#ff8c00'),
+    new THREE.Color('#ff4757'),
+    new THREE.Color('#ff6b9d'),
+    new THREE.Color('#00d4ff'),
+    new THREE.Color('#ffffff')
+  ];
+
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = worldPos.x;
+    positions[i * 3 + 1] = worldPos.y;
+    positions[i * 3 + 2] = worldPos.z;
+
+    const dir = new THREE.Vector3(
+      Math.random() - 0.5,
+      Math.random() - 0.5,
+      Math.random() - 0.5
+    ).normalize();
+    const speed = 0.03 + Math.random() * 0.12;
+    velocities.push(dir.multiplyScalar(speed));
+
+    const col = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+    colorsArr[i * 3] = col.r;
+    colorsArr[i * 3 + 1] = col.g;
+    colorsArr[i * 3 + 2] = col.b;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colorsArr, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.15,
+    vertexColors: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 1
+  });
+
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+
+  celebration = { points, velocities, life: 1 };
+}
+
+function updateCelebration() {
+  if (!celebration) return;
+  const posArr = celebration.points.geometry.attributes.position.array;
+  for (let i = 0; i < celebration.velocities.length; i++) {
+    posArr[i * 3] += celebration.velocities[i].x;
+    posArr[i * 3 + 1] += celebration.velocities[i].y;
+    posArr[i * 3 + 2] += celebration.velocities[i].z;
+    celebration.velocities[i].y += 0.0004; // 微重力
+  }
+  celebration.points.geometry.attributes.position.needsUpdate = true;
+  celebration.life -= 0.006;
+  celebration.points.material.opacity = Math.max(0, celebration.life);
+  if (celebration.life <= 0) {
+    scene.remove(celebration.points);
+    celebration.points.geometry.dispose();
+    celebration.points.material.dispose();
+    celebration = null;
+  }
+}
+
+// ----- 名字精灵透明度更新（背面淡化） -----
+function updateSpriteOpacity() {
+  const cameraPos = camera.position;
+  const worldPos = new THREE.Vector3();
+
+  nameSprites.forEach(item => {
+    if (winnerSprite && item.sprite === winnerSprite) return; // 保持高亮不变
+    item.sprite.getWorldPosition(worldPos);
+    const normal = worldPos.clone().normalize();
+    const toCamera = cameraPos.clone().sub(worldPos).normalize();
+    const dot = normal.dot(toCamera);
+    item.sprite.material.opacity = 0.1 + 0.9 * Math.max(0, dot);
+  });
+}
+
+// ----- 更新环境粒子 -----
+function updateAmbientParticles() {
+  const posArr = ambientParticles.geometry.attributes.position.array;
+  const vels = ambientParticles.userData.velocities;
+  const spread = CONFIG.sphereRadius * 2.8;
+  for (let i = 0; i < vels.length; i++) {
+    posArr[i * 3] += vels[i].x;
+    posArr[i * 3 + 1] += vels[i].y;
+    posArr[i * 3 + 2] += vels[i].z;
+    // 边界回弹
+    if (Math.abs(posArr[i * 3]) > spread / 2) vels[i].x *= -1;
+    if (Math.abs(posArr[i * 3 + 1]) > spread / 2) vels[i].y *= -1;
+    if (Math.abs(posArr[i * 3 + 2]) > spread / 2) vels[i].z *= -1;
+  }
+  ambientParticles.geometry.attributes.position.needsUpdate = true;
+}
+
+// ----- 抽奖逻辑 -----
+function selectWinner() {
+  if (names.length === 0) return;
+
+  const idx = Math.floor(Math.random() * names.length);
+  winnerName = names[idx];
+  state = 'result';
+  currentSpeed = 0;
+  targetSpeed = 0;
+
+  // 高亮中奖精灵
+  const winItem = nameSprites.find(item => item.name === winnerName);
+  if (winItem) {
+    winnerSprite = winItem.sprite;
+    // 替换为金色纹理
+    const goldenTex = createGoldenNameTexture(winnerName);
+    winnerSprite.material.map = goldenTex;
+    winnerSprite.material.opacity = 1;
+    winnerSprite.material.needsUpdate = true;
+    // 放大
+    winnerSprite.scale.set(CONFIG.spriteScale * 3.2, CONFIG.spriteScale * 1.6, 1);
+
+    // 获取世界坐标并发射庆祝粒子
+    const worldPos = new THREE.Vector3();
+    winnerSprite.getWorldPosition(worldPos);
+    spawnCelebration(worldPos);
+  }
+
+  // 显示中奖 UI
+  winnerNameText.textContent = winnerName;
+  winnerDisplay.classList.add('show');
+
+  updateButtons();
+}
+
+function startLottery() {
+  if (names.length === 0) {
+    alert('请先输入抽奖名单！');
+    return;
+  }
+  // 清除上一轮结果
+  clearResult();
+  state = 'spinning';
+  targetSpeed = CONFIG.maxSpeed;
+  updateButtons();
+}
+
+function stopLottery() {
+  if (state !== 'spinning') return;
+  state = 'decelerating';
+  targetSpeed = 0;
+  updateButtons();
+}
+
+function resetLottery() {
+  clearResult();
+  state = 'idle';
+  currentSpeed = 0;
+  targetSpeed = CONFIG.idleSpeed;
+  updateButtons();
+}
+
+function clearResult() {
+  // 恢复 winner 精灵
+  if (winnerSprite && nameSprites.find(item => item.sprite === winnerSprite)) {
+    const originalName = winnerSprite.userData.name;
+    const tex = createNameTexture(originalName);
+    winnerSprite.material.map = tex;
+    winnerSprite.material.opacity = 1;
+    winnerSprite.material.needsUpdate = true;
+    winnerSprite.scale.set(CONFIG.spriteScale * 2, CONFIG.spriteScale, 1);
+  }
+  winnerSprite = null;
+  winnerName = null;
+  winnerDisplay.classList.remove('show');
+  winnerNameText.textContent = '';
+
+  // 清理庆祝粒子
+  if (celebration) {
+    scene.remove(celebration.points);
+    celebration.points.geometry.dispose();
+    celebration.points.material.dispose();
+    celebration = null;
+  }
+}
+
+// ----- 按钮状态 -----
+function updateButtons() {
+  btnStart.disabled = (state === 'spinning' || state === 'decelerating');
+  btnStop.disabled = (state !== 'spinning');
+  btnApply.disabled = (state === 'spinning' || state === 'decelerating');
+  nameInput.disabled = (state === 'spinning' || state === 'decelerating');
+}
+
+// ----- 解析名单 -----
+function parseNames(raw) {
+  return raw
+    .split(/[,，\s]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+}
+
+function applyNames() {
+  if (state === 'spinning' || state === 'decelerating') return;
+  const raw = nameInput.value;
+  names = parseNames(raw);
+  nameCount.textContent = `共 ${names.length} 人`;
+
+  clearResult();
+  createNameSprites();
+  state = 'idle';
+  currentSpeed = 0;
+  targetSpeed = CONFIG.idleSpeed;
+  updateButtons();
+}
+
+// ----- 鼠标交互（手动旋转视角） -----
+let isDragging = false;
+let prevMouse = { x: 0, y: 0 };
+let cameraTheta = 0;        // 水平角
+let cameraPhi = 0.15;       // 垂直角（弧度，初始略俯视）
+
+function updateCameraPosition() {
+  const d = CONFIG.cameraDistance;
+  camera.position.set(
+    d * Math.sin(cameraTheta) * Math.cos(cameraPhi),
+    d * Math.sin(cameraPhi),
+    d * Math.cos(cameraTheta) * Math.cos(cameraPhi)
+  );
+  camera.lookAt(0, 0, 0);
+}
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  isDragging = true;
+  prevMouse.x = e.clientX;
+  prevMouse.y = e.clientY;
+  renderer.domElement.style.cursor = 'grabbing';
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (!isDragging) return;
+  const dx = e.clientX - prevMouse.x;
+  const dy = e.clientY - prevMouse.y;
+  cameraTheta -= dx * 0.005;
+  cameraPhi -= dy * 0.005;
+  cameraPhi = Math.max(-1.2, Math.min(1.2, cameraPhi));
+  updateCameraPosition();
+  prevMouse.x = e.clientX;
+  prevMouse.y = e.clientY;
+});
+
+window.addEventListener('pointerup', () => {
+  isDragging = false;
+  renderer.domElement.style.cursor = 'grab';
+});
+renderer.domElement.style.cursor = 'grab';
+
+// 触摸滚动允许
+renderer.domElement.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  CONFIG.cameraDistance += e.deltaY * 0.01;
+  CONFIG.cameraDistance = Math.max(8, Math.min(28, CONFIG.cameraDistance));
+  updateCameraPosition();
+}, { passive: false });
+
+// ----- 键盘快捷键 -----
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (state === 'spinning') stopLottery();
+    else if (state === 'idle' || state === 'result') startLottery();
+  } else if (e.code === 'KeyR') {
+    resetLottery();
+  }
+});
+
+// ----- 动画循环 -----
+function animate() {
+  requestAnimationFrame(animate);
+
+  // 速度更新
+  if (state === 'spinning') {
+    currentSpeed += (targetSpeed - currentSpeed) * 0.04;
+  } else if (state === 'decelerating') {
+    currentSpeed *= CONFIG.decelFriction;
+    if (currentSpeed < CONFIG.stopThreshold) {
+      currentSpeed = 0;
+      selectWinner();
+    }
+  } else if (state === 'idle') {
+    currentSpeed += (targetSpeed - currentSpeed) * 0.02;
+  }
+  // result: speed stays 0
+
+  // 旋转球体
+  if (!isDragging || state === 'spinning' || state === 'decelerating') {
+    // 非拖拽时主球体自动旋转；拖拽时球体不动（用户旋转视角）
+    sphereGroup.rotation.y += currentSpeed;
+  }
+
+  // 更新精灵透明度
+  updateSpriteOpacity();
+
+  // 庆祝粒子
+  updateCelebration();
+
+  // 环境粒子
+  updateAmbientParticles();
+
+  // 渲染
+  renderer.render(scene, camera);
+}
+
+// ----- 窗口大小调整 -----
+window.addEventListener('resize', () => {
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+});
+
+// ----- 按钮事件 -----
+btnStart.addEventListener('click', startLottery);
+btnStop.addEventListener('click', stopLottery);
+btnReset.addEventListener('click', resetLottery);
+btnApply.addEventListener('click', applyNames);
+
+// ----- 启动应用 -----
+function init() {
+  names = parseNames(nameInput.value);
+  nameCount.textContent = `共 ${names.length} 人`;
+  createNameSprites();
+  updateButtons();
+  updateCameraPosition();
+  renderer.domElement.style.cursor = 'grab';
+  animate();
+}
+
+init();
+</script>
+</body>
+</html>
